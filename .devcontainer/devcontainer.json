@@ -1,0 +1,731 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiko - تطبيق الدردشة</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4361ee; --primary-light: #4895ef; --primary-dark: #3a0ca3;
+            --secondary-color: #7209b7; --danger-color: #f72585; --success-color: #4cc9f0;
+            --warning-color: #f8961e; --info-color: #43aa8b; --light-color: #f8f9fa;
+            --dark-color: #212529; --white: #ffffff; --gray-light: #e9ecef; --gray-dark: #6c757d;
+            --owner-color: #ff9e00; --admin-color: #4caf50; --verified-color: #1DA1F2;
+        }
+        body { background-color: var(--light-color); font-family: 'Tajawal', sans-serif; }
+        .hidden { display: none !important; }
+        .chat-container { display: flex; flex-direction: column; height: 100%; }
+        .chat-messages { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        
+        /* START: MODIFICATION - Styles for Messages, Actions, and Reactions */
+        .message-wrapper { position: relative; }
+        .message { padding: 10px 15px; margin: 8px 0; border-radius: 15px; max-width: 85%; word-wrap: break-word; animation: fadeIn 0.3s ease; transition: background-color 0.2s; position: relative; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .message.sent { background-color: var(--primary-color); color: var(--white); margin-left: auto; border-bottom-right-radius: 5px; }
+        .message.received { background-color: var(--light-color); border: 1px solid var(--gray-light); margin-right: auto; border-bottom-left-radius: 5px; }
+        
+        .message-actions { position: absolute; top: 50%; transform: translateY(-50%); display: none; gap: 5px; background-color: rgba(255, 255, 255, 0.9); padding: 3px 8px; border-radius: 20px; box-shadow: 0 1px 5px rgba(0,0,0,0.1); }
+        .message-wrapper:hover .message-actions { display: flex; }
+        .message-wrapper.sent-wrapper .message-actions { left: -45px; }
+        .message-wrapper.received-wrapper .message-actions { right: -45px; }
+        .action-btn { cursor: pointer; color: var(--gray-dark); font-size: 0.9rem; }
+        .action-btn:hover { color: var(--primary-color); }
+        
+        .reactions-container { position: absolute; bottom: -12px; display: flex; gap: 4px; }
+        .sent .reactions-container { left: 10px; }
+        .received .reactions-container { right: 10px; }
+        .reaction-badge { background-color: var(--white); border: 1px solid var(--gray-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 10px; padding: 1px 6px; font-size: 0.7rem; cursor: pointer; }
+        .reaction-badge.user-reacted { background-color: var(--primary-light); color: white; border-color: var(--primary-color); }
+        .reaction-picker { display: none; position: absolute; bottom: 100%; margin-bottom: 5px; background-color: white; padding: 5px; border-radius: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); gap: 8px; z-index: 10; }
+        .reaction-picker.show { display: flex; }
+        .reaction-picker span { cursor: pointer; font-size: 1.2rem; transition: transform 0.2s; }
+        .reaction-picker span:hover { transform: scale(1.3); }
+        /* END: MODIFICATION */
+
+        .avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; cursor: pointer; transition: transform 0.2s; }
+        .avatar:hover { transform: scale(1.1); }
+        .timestamp { font-size: 0.75rem; opacity: 0.8; display: block; margin-top: 5px; }
+        .chat-header { padding: 12px 15px; border-bottom: 1px solid var(--gray-light); background-color: var(--white); display: flex; align-items: center; }
+        .status-indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-left: 8px; }
+        .online { background-color: var(--success-color); }
+        .offline { background-color: var(--gray-dark); }
+        .full-chat-view { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--white); z-index: 1030; display: flex; flex-direction: column; }
+        .back-to-list { position: absolute; top: 15px; left: 15px; z-index: 1031; }
+        .user-list-item { cursor: pointer; transition: background-color 0.2s; }
+        .chat-input { padding: 12px; border-top: 1px solid var(--gray-light); background-color: #fff; }
+        .app-logo { width: 100px; height: 100px; object-fit: contain; margin-bottom: 20px; }
+        .owner-badge, .admin-badge, .verified-badge { position: absolute; top: -5px; right: -5px; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border: 2px solid white; }
+        .owner-badge { background-color: var(--owner-color); } .admin-badge { background-color: var(--admin-color); } .verified-badge { background-color: var(--verified-color); }
+        .avatar-container { position: relative; display: inline-block; }
+        .settings-menu { position: fixed; bottom: 20px; left: 20px; z-index: 1020; }
+        .settings-btn { width: 50px; height: 50px; border-radius: 50%; background-color: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); cursor: pointer; transition: all 0.3s ease; }
+        .settings-dropdown { position: absolute; bottom: 65px; left: 0; width: 220px; background-color: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15); overflow: hidden; display: none; }
+        .settings-dropdown.show { display: block; }
+        .settings-item { padding: 12px 15px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; }
+        .settings-item:hover { background-color: var(--light-color); }
+        .settings-item i { margin-left: 12px; width: 20px; text-align: center; color: var(--primary-color); }
+        .offline-banner { position: fixed; bottom: 0; width: 100%; background-color: var(--danger-color); color: white; padding: 8px; z-index: 1100; text-align: center; }
+        .profile-avatar { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid var(--primary-color); margin: 0 auto 15px; }
+        .profile-bio { font-size: 0.9rem; color: var(--gray-dark); margin: -5px 0 15px 0; min-height: 20px;}
+        .profile-details .profile-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray-light); }
+        .profile-details .profile-item:last-child { border-bottom: none; }
+        .profile-details .profile-item span:first-child { font-weight: bold; color: var(--dark-color); }
+        .profile-details .profile-item span:last-child { color: var(--gray-dark); }
+        .modal-header { border-bottom: none; }
+        .switch-account-item { display: flex; align-items: center; padding: 8px; border-radius: 5px; cursor: pointer; }
+        .switch-account-item:hover { background-color: var(--light-color); }
+        .switch-account-item.active { background-color: var(--primary-light); color: white; }
+        .report-reason-list .list-group-item { cursor: pointer; }
+        .call-modal-container { position: relative; width: 100%; height: 70vh; background-color: #2c2c2c; display: flex; align-items: center; justify-content: center; }
+        .remote-video { width: 100%; height: 100%; object-fit: cover; background-color: #000; }
+        .local-video { position: absolute; bottom: 20px; right: 20px; width: 150px; height: auto; border: 2px solid white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .call-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); }
+        .incoming-call-toast { position: fixed; top: 20px; right: 20px; z-index: 2000; }
+        #call-audio-ui { text-align: center; color: white; }
+        #call-remote-avatar { width: 150px; height: 150px; border-radius: 50%; border: 4px solid var(--primary-color); margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div id="offline-banner" class="offline-banner hidden"><i class="fas fa-wifi-slash me-2"></i>أنت غير متصل بالإنترنت.</div>
+
+    <!-- واجهة الحسابات -->
+    <div id="auth-container" class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <img src="https://l.top4top.io/p_3372tykx11.png" class="app-logo" alt="شعار Fiko">
+                        <h3 class="card-title mb-4">تسجيل الدخول</h3>
+                        <input type="email" id="login-email" class="form-control mb-2" placeholder="البريد الإلكتروني" required>
+                        <input type="password" id="login-password" class="form-control mb-3" placeholder="كلمة المرور" required>
+                        <button id="login-button" class="btn btn-primary w-100 py-2 mb-2">تسجيل الدخول</button>
+                        <button id="register-button" class="btn btn-outline-secondary w-100 py-2">إنشاء حساب جديد</button>
+                        <div class="mt-3"><a href="#" id="forgot-password-link" class="text-decoration-none small">نسيت كلمة المرور؟</a></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- واجهة المستخدمين الرئيسية -->
+    <div id="users-container" class="container-fluid mt-2 hidden">
+        <div class="d-flex justify-content-between align-items-center p-2 bg-white shadow-sm mb-2 rounded">
+            <h4 class="mb-0 text-primary">Fiko</h4>
+            <div>
+                 <button id="refresh-data-btn" class="btn btn-sm btn-outline-secondary" title="تحديث البيانات"><i class="fas fa-sync-alt"></i></button>
+                 <button id="my-profile-btn" class="btn btn-sm btn-outline-primary ms-2"><i class="fas fa-user"></i> ملفي الشخصي</button>
+                 <button id="admin-panel-button" class="btn btn-sm btn-outline-danger hidden ms-2" title="لوحة التحكم"><i class="fas fa-shield-halved"></i></button>
+            </div>
+        </div>
+        <div class="input-group mb-3"><input type="text" id="search-input" class="form-control" placeholder="ابحث عن مستخدم..."><span class="input-group-text"><i class="fas fa-search"></i></span></div>
+        
+        <ul class="nav nav-tabs nav-fill mb-2" id="main-tabs" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" id="all-users-tab" data-bs-toggle="tab" data-bs-target="#all-users-panel" type="button" role="tab">الكل</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" id="friends-tab" data-bs-toggle="tab" data-bs-target="#friends-panel" type="button" role="tab">الأصدقاء</button></li>
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div class="tab-pane fade show active" id="all-users-panel" role="tabpanel"><div class="list-group" id="user-list"></div></div>
+            <div class="tab-pane fade" id="friends-panel" role="tabpanel"><div class="list-group" id="friend-list"></div></div>
+        </div>
+    </div>
+
+    <!-- واجهة الدردشة -->
+    <div id="full-chat-view" class="full-chat-view hidden">
+        <div class="chat-header">
+            <button id="back-to-list" class="btn btn-primary btn-sm me-3"><i class="fas fa-arrow-right"></i></button>
+            <img id="chat-avatar" src="" class="avatar me-2" alt="Avatar">
+            <div class="flex-grow-1">
+                <h6 class="mb-0" id="chat-username"></h6>
+                <!-- START: MODIFICATION - Typing indicator will appear here -->
+                <small id="user-status" class="text-muted"></small>
+                <!-- END: MODIFICATION -->
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="call-dropdown-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-phone"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="call-dropdown-btn">
+                    <li><a class="dropdown-item" href="#" id="video-call-btn" data-call-type="video"><i class="fas fa-video me-2"></i>مكالمة فيديو</a></li>
+                    <li><a class="dropdown-item" href="#" id="audio-call-btn" data-call-type="audio"><i class="fas fa-microphone me-2"></i>مكالمة صوتية</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input input-group">
+            <input type="text" id="message-input" class="form-control" placeholder="اكتب رسالة...">
+            <button id="send-button" class="btn btn-primary"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+    
+    <!-- قائمة الإعدادات العائمة -->
+    <div class="settings-menu hidden" id="settings-menu">
+        <div class="settings-btn" id="settings-btn"><i class="fas fa-cog"></i></div>
+        <div class="settings-dropdown" id="settings-dropdown">
+            <div class="settings-item" id="account-settings-btn"><i class="fas fa-user-cog"></i> إعدادات الحساب</div>
+            <div class="settings-item" id="notifications-toggle-btn">
+                <i class="fas fa-bell"></i> <span id="notification-status-text">إيقاف الإشعارات</span>
+            </div>
+            <div class="settings-item" id="switch-account-btn"><i class="fas fa-exchange-alt"></i> تبديل الحساب</div>
+            <div class="settings-item" id="blocked-users-btn"><i class="fas fa-user-slash"></i> المستخدمون المحظورون</div>
+            <div class="settings-item" id="logout-btn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</div>
+        </div>
+    </div>
+
+    <!-- Modals (النوافذ المنبثقة) -->
+    <div class="modal fade" id="register-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">إنشاء حساب جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="text" id="register-username" class="form-control mb-2" placeholder="اسم المستخدم" required><input type="email" id="register-email" class="form-control mb-2" placeholder="البريد الإلكتروني" required><input type="password" id="register-password" class="form-control mb-2" placeholder="كلمة المرور (6+ أحرف)" required><input type="password" id="register-confirm-password" class="form-control mb-3" placeholder="تأكيد كلمة المرور" required><div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="accept-terms"><label class="form-check-label small" for="accept-terms">أوافق على شروط وأحكام الاستخدام.</label></div><button id="register-submit" class="btn btn-primary w-100">إنشاء</button></div></div></div></div>
+    <div class="modal fade" id="password-reset-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">إعادة تعيين كلمة المرور</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="small text-muted">أدخل بريدك الإلكتروني المسجل وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.</p><input type="email" id="reset-email-input" class="form-control" placeholder="البريد الإلكتروني"><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button><button type="button" id="send-reset-link-btn" class="btn btn-primary">إرسال</button></div></div></div></div></div>
+    <div class="modal fade" id="user-profile-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-body text-center p-4"><img id="profile-view-avatar" class="profile-avatar"><h4 id="profile-view-username" class="mb-1"></h4><p id="profile-view-bio" class="profile-bio"></p><div class="profile-details text-end mt-3"><div class="profile-item"><span>تاريخ الانضمام</span><span id="profile-view-joined"></span></div><div class="profile-item"><span>آخر ظهور</span><span id="profile-view-last-seen"></span></div></div><div id="mutual-friends-container" class="text-end mt-3 hidden"><h6 class="mb-2">أصدقاء مشتركون (<span id="mutual-friends-count">0</span>)</h6><div id="mutual-friends-list" class="d-flex flex-wrap gap-2 justify-content-end"></div></div><div class="d-grid gap-2 mt-4"><button id="add-friend-btn" class="btn btn-success"><i class="fas fa-user-plus me-2"></i>إضافة صديق</button><button id="block-user-btn" class="btn btn-outline-danger"><i class="fas fa-ban me-2"></i>حظر المستخدم</button><button id="report-user-btn" class="btn btn-outline-warning mt-2"><i class="fas fa-flag me-2"></i>إبلاغ عن المستخدم</button></div></div></div></div></div>
+    <div class="modal fade" id="account-settings-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">إعدادات حسابي</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><h6>تغيير النبذة التعريفية (Bio)</h6><textarea id="profile-bio-input" class="form-control mb-3" rows="3" placeholder="اكتب شيئًا عن نفسك..."></textarea><hr><h6>تغيير كلمة المرور</h6><input type="password" id="current-password" class="form-control mb-2" placeholder="كلمة المرور الحالية"><input type="password" id="new-password" class="form-control mb-2" placeholder="كلمة المرور الجديدة"><input type="password" id="confirm-new-password" class="form-control" placeholder="تأكيد كلمة المرور الجديدة"><hr><h6 class="text-danger">منطقة الخطر</h6><p class="small text-muted">هذا الإجراء سيقوم بحذف حسابك وجميع بياناتك نهائياً ولا يمكن التراجع عنه.</p><button id="delete-account-btn" class="btn btn-danger w-100">حذف الحساب نهائياً</button></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button><button type="button" id="save-settings-btn" class="btn btn-primary">حفظ التغييرات</button></div></div></div></div>
+    <div class="modal fade" id="switch-account-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">تبديل الحساب</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="switch-account-list"></div></div></div></div></div>
+    <div class="modal fade" id="blocked-users-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">المستخدمون المحظورون</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="list-group" id="blocked-users-list"></div></div></div></div></div>
+    <div class="modal fade" id="report-user-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">الإبلاغ عن <span id="report-modal-username"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-muted small">الرجاء تحديد سبب البلاغ. سيتم مراجعة البلاغ من قبل الإدارة.</p><div class="list-group report-reason-list"><label class="list-group-item"><input class="form-check-input me-2" type="radio" name="reportReason" value="spam"> رسائل مزعجة أو احتيال</label><label class="list-group-item"><input class="form-check-input me-2" type="radio" name="reportReason" value="harassment"> مضايقة أو تنمر</label><label class="list-group-item"><input class="form-check-input me-2" type="radio" name="reportReason" value="inappropriate_content"> محتوى غير لائق (صور، كلام)</label><label class="list-group-item"><input class="form-check-input me-2" type="radio" name="reportReason" value="other"> سبب آخر</label></div><textarea id="report-details-input" class="form-control mt-3" rows="3" placeholder="يرجى تقديم تفاصيل إضافية هنا (اختياري)"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button><button type="button" id="submit-report-btn" class="btn btn-primary">إرسال البلاغ</button></div></div></div></div>
+    <div class="modal fade" id="delete-account-confirm-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header bg-danger text-white"><h5 class="modal-title">تأكيد حذف الحساب</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="fw-bold">تحذير خطير: أنت على وشك حذف حسابك بشكل نهائي!</p><p>سيتم حذف جميع رسائلك، أصدقائك، وبياناتك الشخصية ولا يمكن استرجاعها أبداً.</p><p>للمتابعة وتأكيد هذا الإجراء، يرجى كتابة كلمة "<strong class="text-danger">حذف</strong>" في الحقل أدناه:</p><input type="text" id="delete-confirm-input" class="form-control" autocomplete="off"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button><button type="button" id="final-delete-btn" class="btn btn-danger" disabled>أنا أفهم العواقب، احذف حسابي</button></div></div></div></div>
+    <div class="modal fade" id="admin-panel-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title"><i class="fas fa-shield-halved me-2"></i>لوحة تحكم المالك</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><ul class="nav nav-tabs nav-fill" id="admin-tabs" role="tablist"><li class="nav-item" role="presentation"><button class="nav-link active" id="admin-reports-tab" data-bs-toggle="tab" data-bs-target="#admin-reports-panel" type="button" role="tab">البلاغات</button></li><li class="nav-item" role="presentation"><button class="nav-link" id="admin-users-tab" data-bs-toggle="tab" data-bs-target="#admin-users-panel" type="button" role="tab">إدارة المستخدمين</button></li><li class="nav-item" role="presentation"><button class="nav-link" id="admin-announce-tab" data-bs-toggle="tab" data-bs-target="#admin-announce-panel" type="button" role="tab">إرسال إعلان</button></li></ul><div class="tab-content pt-3" id="admin-tab-content"><div class="tab-pane fade show active" id="admin-reports-panel" role="tabpanel"><div id="admin-reports-list" class="list-group"></div></div><div class="tab-pane fade" id="admin-users-panel" role="tabpanel"><div class="input-group mb-3"><input type="text" id="admin-user-search" class="form-control" placeholder="بحث عن مستخدم بالإسم أو الإيميل..."><span class="input-group-text"><i class="fas fa-search"></i></span></div><div id="admin-users-list" class="list-group"></div></div><div class="tab-pane fade" id="admin-announce-panel" role="tabpanel"><h5>إرسال إعلان أو تنبيه عام</h5><p class="small text-muted">سيظهر هذا الإعلان لجميع المستخدمين عند فتحهم للتطبيق.</p><textarea id="announcement-text" class="form-control" rows="4" placeholder="اكتب نص الإعلان هنا..."></textarea><button id="send-announcement-btn" class="btn btn-primary mt-3 w-100">إرسال الإعلان</button></div></div></div></div></div></div>
+    <div class="modal fade" id="call-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content"><div class="modal-body p-0"><div class="call-modal-container"><div id="call-audio-ui" class="hidden"><img id="call-remote-avatar" src="" alt="Avatar"><h3 id="call-remote-username"></h3><p>جاري الاتصال...</p></div><video id="remote-video" class="remote-video hidden" autoplay playsinline></video><video id="local-video" class="local-video" autoplay playsinline muted></video><div class="call-controls"><button id="hang-up-btn" class="btn btn-danger btn-lg rounded-circle" style="width: 70px; height: 70px;"><i class="fas fa-phone-slash fa-2x"></i></button></div></div></div></div></div></div>
+    <div class="toast-container incoming-call-toast"><div id="incoming-call-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false"><div class="toast-header"><i class="fas fa-phone-alt me-2 text-primary"></i><strong class="me-auto" id="incoming-call-title">مكالمة واردة</strong><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div><div class="toast-body"><p>لديك مكالمة من <strong id="caller-name"></strong>.</p><div class="mt-2 pt-2 border-top"><button type="button" id="accept-call-btn" class="btn btn-success btn-sm">قبول</button><button type="button" id="reject-call-btn" class="btn btn-danger btn-sm">رفض</button></div></div></div></div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
+
+    <script>
+        // --- START: Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyC1qRlfUN4EpuEMoIH_4NuKv6i8DjPpnFE",
+            authDomain: "fiko-74102.firebaseapp.com",
+            databaseURL: "https://fiko-74102-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "fiko-74102",
+            storageBucket: "fiko-74102.appspot.com",
+            messagingSenderId: "1091698704319",
+            appId: "1:1091698704319:web:1a01bdf14dd42eaf53ab0a"
+        };
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+        // --- END: Firebase Configuration ---
+
+        // START: MODIFICATION - Added firasse43@gmail.com to owner list
+        const OWNER_EMAILS = ['fiko@fiko.com', 'firasse43@gmail.com', 'fiko-super-admin@fiko.com'];
+        // END: MODIFICATION
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // -- عناصر الواجهة --
+            const elements = {
+                authContainer: document.getElementById('auth-container'), usersContainer: document.getElementById('users-container'),
+                fullChatView: document.getElementById('full-chat-view'), loginButton: document.getElementById('login-button'),
+                registerButton: document.getElementById('register-button'), forgotPasswordLink: document.getElementById('forgot-password-link'),
+                adminPanelButton: document.getElementById('admin-panel-button'), accountSettingsBtn: document.getElementById('account-settings-btn'),
+                searchInput: document.getElementById('search-input'), userList: document.getElementById('user-list'), friendList: document.getElementById('friend-list'),
+                registerSubmit: document.getElementById('register-submit'), backToListButton: document.getElementById('back-to-list'),
+                messageInput: document.getElementById('message-input'), sendButton: document.getElementById('send-button'),
+                chatUsername: document.getElementById('chat-username'), chatAvatar: document.getElementById('chat-avatar'),
+                userStatus: document.getElementById('user-status'), chatMessages: document.getElementById('chat-messages'),
+                settingsMenu: document.getElementById('settings-menu'), settingsBtn: document.getElementById('settings-btn'),
+                settingsDropdown: document.getElementById('settings-dropdown'), logoutBtn: document.getElementById('logout-btn'),
+                switchAccountBtn: document.getElementById('switch-account-btn'), blockedUsersBtn: document.getElementById('blocked-users-btn'),
+                offlineBanner: document.getElementById('offline-banner'), sendResetLinkBtn: document.getElementById('send-reset-link-btn'),
+                saveSettingsBtn: document.getElementById('save-settings-btn'), myProfileBtn: document.getElementById('my-profile-btn'),
+                refreshDataBtn: document.getElementById('refresh-data-btn'),
+                notificationsToggleBtn: document.getElementById('notifications-toggle-btn'),
+                deleteAccountBtn: document.getElementById('delete-account-btn'),
+                finalDeleteBtn: document.getElementById('final-delete-btn'),
+                deleteConfirmInput: document.getElementById('delete-confirm-input'),
+                submitReportBtn: document.getElementById('submit-report-btn'),
+                adminUserSearch: document.getElementById('admin-user-search'), sendAnnouncementBtn: document.getElementById('send-announcement-btn'),
+                videoCallBtn: document.getElementById('video-call-btn'), audioCallBtn: document.getElementById('audio-call-btn'),
+                hangUpBtn: document.getElementById('hang-up-btn'),
+                localVideo: document.getElementById('local-video'), remoteVideo: document.getElementById('remote-video'),
+                callAudioUI: document.getElementById('call-audio-ui'),
+                callRemoteAvatar: document.getElementById('call-remote-avatar'),
+                callRemoteUsername: document.getElementById('call-remote-username'),
+                acceptCallBtn: document.getElementById('accept-call-btn'), rejectCallBtn: document.getElementById('reject-call-btn'),
+                callerName: document.getElementById('caller-name'),
+                incomingCallTitle: document.getElementById('incoming-call-title'),
+            };
+
+            const modals = {
+                register: new bootstrap.Modal(document.getElementById('register-modal')),
+                passwordReset: new bootstrap.Modal(document.getElementById('password-reset-modal')),
+                userProfile: new bootstrap.Modal(document.getElementById('user-profile-modal')),
+                accountSettings: new bootstrap.Modal(document.getElementById('account-settings-modal')),
+                switchAccount: new bootstrap.Modal(document.getElementById('switch-account-modal')),
+                blockedUsers: new bootstrap.Modal(document.getElementById('blocked-users-modal')),
+                adminPanel: new bootstrap.Modal(document.getElementById('admin-panel-modal')),
+                call: new bootstrap.Modal(document.getElementById('call-modal')),
+                reportUser: new bootstrap.Modal(document.getElementById('report-user-modal')),
+                deleteAccountConfirm: new bootstrap.Modal(document.getElementById('delete-account-confirm-modal')),
+            };
+            const toasts = {
+                incomingCall: new bootstrap.Toast(document.getElementById('incoming-call-toast')),
+            };
+
+            let currentUser = null; let selectedUser = null; let blockedUsers = [];
+            let friends = []; let allUsersCache = {};
+            let viewingProfileUid = null;
+            // START: MODIFICATION - Add state variables for new features
+            let messagesListener = null; let typingListener = null; let typingTimeout = null;
+            // END: MODIFICATION
+
+            let pc; let localStream; let callListener = null; let incomingCallData = null;
+            const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]};
+            
+            const initApp = () => {
+                setupConnectionListener();
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        loadUserDataAndStart(user);
+                    } else {
+                        showAuthView();
+                    }
+                });
+                addEventListeners();
+            };
+            
+            const setupConnectionListener = () => {
+                database.ref(".info/connected").on("value", snapshot => {
+                    const isOnline = snapshot.val();
+                    elements.offlineBanner.classList.toggle('hidden', isOnline);
+                    if (currentUser && isOnline) updateUserPresence();
+                });
+            };
+
+            const showAuthView = () => {
+                currentUser = null;
+                elements.authContainer.classList.remove('hidden');
+                elements.usersContainer.classList.add('hidden');
+                elements.fullChatView.classList.add('hidden');
+                elements.settingsMenu.classList.add('hidden');
+            };
+
+            const showMainView = () => {
+                elements.authContainer.classList.add('hidden');
+                elements.usersContainer.classList.remove('hidden');
+                elements.settingsMenu.classList.remove('hidden');
+            };
+
+            const showAlert = (message, type = 'danger') => {
+                const alertContainer = document.createElement('div');
+                alertContainer.style.cssText = `position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2000;`;
+                alertContainer.innerHTML = `<div class="alert alert-${type} shadow-sm" role="alert">${message}</div>`;
+                document.body.appendChild(alertContainer);
+                setTimeout(() => alertContainer.remove(), 4000);
+            };
+
+            const loadUserDataAndStart = async (user) => {
+                const userSnap = await database.ref(`users/${user.uid}`).once('value');
+                if (userSnap.exists()) {
+                    const userData = userSnap.val();
+                    if (userData.isBanned) {
+                        showAlert('تم تقييد هذا الحساب. الرجاء التواصل مع الإدارة.');
+                        auth.signOut(); return;
+                    }
+
+                    // START: MODIFICATION - Self-correcting owner status
+                    const isOwnerInCode = OWNER_EMAILS.includes(user.email);
+                    if (userData.isOwner !== isOwnerInCode) {
+                        await database.ref(`users/${user.uid}/isOwner`).set(isOwnerInCode);
+                        userData.isOwner = isOwnerInCode;
+                    }
+                    // END: MODIFICATION
+
+                    currentUser = { uid: user.uid, email: user.email, ...userData };
+                    currentUser.settings = userData.settings || { notifications: true };
+                    updateNotificationToggleUI();
+                    
+                    blockedUsers = Object.keys(currentUser.blocked || {});
+                    friends = Object.keys(currentUser.friends || {});
+                    allUsersCache = (await database.ref('users').once('value')).val() || {};
+                    showMainView(); updateUserPresence(); renderAllLists();
+                    listenForAnnouncements();
+                    listenForCalls();
+                    elements.adminPanelButton.classList.toggle('hidden', !currentUser.isOwner);
+                    addAccountToStorage(currentUser.email);
+                    if(Notification.permission === 'default') {
+                        requestNotificationPermission();
+                    }
+                } else { auth.signOut(); }
+            };
+            
+            const updateUserPresence = () => {
+                const userStatusRef = database.ref(`/status/${currentUser.uid}`);
+                userStatusRef.set({ status: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP });
+                userStatusRef.onDisconnect().set({ status: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP });
+                database.ref(`users/${currentUser.uid}/lastSeen`).set(firebase.database.ServerValue.TIMESTAMP);
+            };
+
+            const login = () => {
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value.trim();
+                if (!email || !password) return showAlert('الرجاء إدخال البريد الإلكتروني وكلمة المرور');
+                auth.signInWithEmailAndPassword(email, password).catch(err => showAlert('البريد أو كلمة المرور غير صحيحة أو تم تقييد الحساب.'));
+            };
+
+            const registerUser = async () => {
+                const username = document.getElementById('register-username').value.trim();
+                const email = document.getElementById('register-email').value.trim().toLowerCase();
+                const password = document.getElementById('register-password').value.trim();
+                if (password !== document.getElementById('register-confirm-password').value.trim()) return showAlert('كلمتا المرور غير متطابقتين.');
+                if (!document.getElementById('accept-terms').checked) return showAlert('يجب الموافقة على الشروط.');
+                const usernameSnap = await database.ref('users').orderByChild('username').equalTo(username).once('value');
+                if (usernameSnap.exists()) return showAlert('اسم المستخدم محجوز.');
+                try {
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    const userData = {
+                        username, email, bio: '',
+                        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random&color=fff`,
+                        joinedDate: firebase.database.ServerValue.TIMESTAMP, lastSeen: firebase.database.ServerValue.TIMESTAMP,
+                        isOwner: OWNER_EMAILS.includes(email),
+                        settings: { notifications: true } // Default setting
+                    };
+                    await database.ref(`users/${user.uid}`).set(userData);
+                    showAlert('تم إنشاء الحساب بنجاح!', 'success');
+                    modals.register.hide();
+                } catch (error) { showAlert(error.code === 'auth/email-already-in-use' ? 'البريد الإلكتروني مسجل بالفعل.' : 'حدث خطأ.'); }
+            };
+            
+            const renderAllLists = async () => {
+                const statusSnap = await database.ref('status').once('value');
+                const statuses = statusSnap.val() || {};
+                const searchTerm = elements.searchInput.value.toLowerCase();
+                let allUsersHtml = ''; let friendUsersHtml = '';
+                let usersToSort = Object.keys(allUsersCache)
+                    .filter(uid => uid !== currentUser.uid && !blockedUsers.includes(uid) && !allUsersCache[uid].isBanned)
+                    .map(uid => ({ uid, ...allUsersCache[uid], status: (statuses[uid] || {}).status || 'offline' }))
+                    .sort((a, b) => (a.status === 'online' ? -1 : 1) - (b.status === 'online' ? -1 : 1) || b.lastSeen - a.lastSeen);
+                
+                usersToSort.forEach(user => {
+                    if (searchTerm && !user.username.toLowerCase().includes(searchTerm)) return;
+                    const userHtml = createUserItemHtml(user);
+                    allUsersHtml += userHtml;
+                    if (friends.includes(user.uid)) friendUsersHtml += userHtml;
+                });
+                elements.userList.innerHTML = allUsersHtml || `<p class="text-center text-muted p-3">لا يوجد مستخدمون لعرضهم.</p>`;
+                elements.friendList.innerHTML = friendUsersHtml || `<p class="text-center text-muted p-3">لا يوجد أصدقاء لعرضهم.</p>`;
+            };
+
+            const createUserItemHtml = (user) => {
+                 const isFriend = friends.includes(user.uid);
+                 return `
+                    <div class="list-group-item list-group-item-action d-flex align-items-center user-list-item" data-uid="${user.uid}">
+                        <div class="avatar-container me-3">
+                            <img src="${user.avatar}" class="avatar" data-uid="${user.uid}" alt="${user.username}">
+                            ${user.isOwner ? '<span class="owner-badge" title="مالك"><i class="fas fa-crown"></i></span>' : ''}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${user.username} ${isFriend ? '<i class="fas fa-star text-warning" title="صديق"></i>' : ''}</h6>
+                                <span class="status-indicator ${user.status}"></span>
+                            </div>
+                            <small class="text-muted">${user.status === 'online' ? 'متصل الآن' : 'غير متصل'}</small>
+                        </div>
+                    </div>`;
+            };
+            
+            const selectUser = (uid) => {
+                const user = allUsersCache[uid];
+                if (!user) return;
+                selectedUser = { uid, ...user };
+                elements.usersContainer.classList.add('hidden');
+                elements.fullChatView.classList.remove('hidden');
+                elements.settingsMenu.classList.add('hidden');
+                elements.chatUsername.textContent = user.username;
+                elements.chatAvatar.src = user.avatar;
+                database.ref(`status/${uid}`).on('value', snap => {
+                    if (selectedUser && selectedUser.uid === uid) {
+                        elements.userStatus.textContent = (snap.val() || {}).status === 'online' ? 'متصل' : 'غير متصل';
+                    }
+                });
+                loadMessages(uid);
+                // START: MODIFICATION - Listen for typing status
+                listenForTyping(uid);
+                // END: MODIFICATION
+            };
+
+            const backToList = () => {
+                elements.fullChatView.classList.add('hidden');
+                elements.usersContainer.classList.remove('hidden');
+                elements.settingsMenu.classList.remove('hidden');
+                
+                // START: MODIFICATION - Clear listeners and typing status
+                if (messagesListener) {
+                    messagesListener.off();
+                    messagesListener = null;
+                }
+                if (typingListener) {
+                    typingListener.off();
+                    typingListener = null;
+                }
+                if (selectedUser) {
+                    database.ref(`status/${selectedUser.uid}`).off();
+                    const chatId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
+                    database.ref(`typing_status/${chatId}/${currentUser.uid}`).remove();
+                }
+                // END: MODIFICATION
+                selectedUser = null;
+            }
+
+            // START: MODIFICATION - Complete rewrite of message loading to support delete/reactions
+            const loadMessages = (receiverId) => {
+                if (messagesListener) messagesListener.off();
+                elements.chatMessages.innerHTML = '';
+                const chatId = currentUser.uid < receiverId ? `${currentUser.uid}_${receiverId}` : `${receiverId}_${currentUser.uid}`;
+                messagesListener = database.ref('messages').orderByChild('chatId').equalTo(chatId);
+
+                messagesListener.on('child_added', (snap) => {
+                    const message = { id: snap.key, ...snap.val() };
+                    displayMessage(message);
+                });
+
+                messagesListener.on('child_removed', (snap) => {
+                    const messageElement = document.getElementById(`msg-${snap.key}`);
+                    if (messageElement) {
+                        messageElement.style.transition = 'opacity 0.3s, transform 0.3s';
+                        messageElement.style.opacity = '0';
+                        messageElement.style.transform = 'scale(0.8)';
+                        setTimeout(() => messageElement.remove(), 300);
+                    }
+                });
+
+                messagesListener.on('child_changed', (snap) => {
+                    const messageId = snap.key;
+                    const messageData = snap.val();
+                    const messageElement = document.getElementById(`msg-${messageId}`);
+                    if (messageElement) {
+                        const reactionsContainer = messageElement.querySelector('.reactions-container');
+                        if (reactionsContainer) {
+                             reactionsContainer.innerHTML = createReactionsHtml(messageData.reactions, messageId);
+                        }
+                    }
+                });
+            };
+            
+            const displayMessage = (message) => {
+                const isSent = message.sender === currentUser.uid;
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-wrapper ${isSent ? 'sent-wrapper' : 'received-wrapper'}`;
+                wrapper.id = `msg-${message.id}`;
+
+                const reactionsHtml = createReactionsHtml(message.reactions, message.id);
+
+                wrapper.innerHTML = `
+                    <div class="message ${isSent ? 'sent' : 'received'}">
+                        <p class="mb-0">${message.text}</p>
+                        <small class="timestamp">${new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
+                        <div class="reactions-container">${reactionsHtml}</div>
+                    </div>
+                    <div class="message-actions">
+                        <i class="fas fa-smile action-btn" data-action="pick-reaction" data-message-id="${message.id}"></i>
+                        ${isSent ? `<i class="fas fa-trash-alt action-btn" data-action="delete" data-message-id="${message.id}"></i>` : ''}
+                        <div class="reaction-picker" data-picker-for="${message.id}">
+                            <span data-action="react" data-emoji="👍" data-message-id="${message.id}">👍</span>
+                            <span data-action="react" data-emoji="❤️" data-message-id="${message.id}">❤️</span>
+                            <span data-action="react" data-emoji="😂" data-message-id="${message.id}">😂</span>
+                            <span data-action="react" data-emoji="😮" data-message-id="${message.id}">😮</span>
+                            <span data-action="react" data-emoji="😢" data-message-id="${message.id}">😢</span>
+                        </div>
+                    </div>
+                `;
+                
+                elements.chatMessages.appendChild(wrapper);
+                elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+
+                // Feature: Bubble up chat on new message. This ensures the chat list is always current.
+                const otherUserId = isSent ? selectedUser.uid : message.sender;
+                const userListItem = document.querySelector(`#user-list .user-list-item[data-uid="${otherUserId}"]`);
+                if (userListItem) elements.userList.prepend(userListItem);
+                const friendListItem = document.querySelector(`#friend-list .user-list-item[data-uid="${otherUserId}"]`);
+                if (friendListItem) elements.friendList.prepend(friendListItem);
+
+                if (!isSent && document.hidden) {
+                   const senderInfo = allUsersCache[message.sender];
+                   if (senderInfo) {
+                       showNotification(`رسالة جديدة من ${senderInfo.username}`, message.text, senderInfo.avatar);
+                   }
+                }
+            };
+
+            const sendMessage = () => {
+                const text = elements.messageInput.value.trim();
+                if (!text || !selectedUser) return;
+                const chatId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
+                database.ref('messages').push({
+                    chatId, text, sender: currentUser.uid, receiver: selectedUser.uid,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                }).then(() => {
+                     elements.messageInput.value = ''; elements.messageInput.focus();
+                     // Stop showing "typing" indicator after sending
+                     database.ref(`typing_status/${chatId}/${currentUser.uid}`).remove();
+                     if (typingTimeout) clearTimeout(typingTimeout);
+                }).catch(error => showAlert("فشل إرسال الرسالة."));
+            };
+            // END: MODIFICATION
+
+            const requestNotificationPermission = async () => { if (!("Notification" in window)) { showAlert('متصفحك لا يدعم الإشعارات.'); return; } if (Notification.permission !== "granted" && Notification.permission !== "denied") { const permission = await Notification.requestPermission(); if (permission === 'granted') { showAlert('تم تفعيل الإشعارات بنجاح!', 'success'); } else { showAlert('تم رفض إذن الإشعارات.', 'warning'); } } };
+            const showNotification = (title, body, icon) => { if (!("Notification" in window) || Notification.permission !== "granted") return; if (currentUser.settings && currentUser.settings.notifications === false) return; new Notification(title, { body, icon }); };
+
+            const startCall = async (callType) => { if (!selectedUser) return; try { const constraints = { video: (callType === 'video'), audio: true }; localStream = await navigator.mediaDevices.getUserMedia(constraints); elements.localVideo.srcObject = localStream; } catch (e) { showAlert('لا يمكن الوصول للكاميرا والميكروفون. يرجى التأكد من الأذونات.', 'danger'); return; } setupCallUI(callType, selectedUser); modals.call.show(); pc = new RTCPeerConnection(configuration); localStream.getTracks().forEach(track => pc.addTrack(track, localStream)); pc.ontrack = event => { elements.remoteVideo.srcObject = event.streams[0]; }; pc.onicecandidate = event => { if (event.candidate) database.ref(`calls/${selectedUser.uid}/iceCandidates`).push(event.candidate.toJSON()); }; const offer = await pc.createOffer(); await pc.setLocalDescription(offer); const callData = { type: callType, offer: { sdp: offer.sdp, type: offer.type }, from: currentUser.uid, }; await database.ref(`calls/${selectedUser.uid}`).set(callData); database.ref(`calls/${currentUser.uid}/answer`).on('value', async snapshot => { if (snapshot.exists()) { await pc.setRemoteDescription(new RTCSessionDescription(snapshot.val())); snapshot.ref.remove(); } }); database.ref(`calls/${currentUser.uid}/iceCandidates`).on('child_added', async snapshot => { if (snapshot.exists()) { await pc.addIceCandidate(new RTCIceCandidate(snapshot.val())); snapshot.ref.remove(); } }); };
+            const listenForCalls = () => { if (callListener) callListener.off(); callListener = database.ref(`calls/${currentUser.uid}`); callListener.on('value', async snapshot => { if (snapshot.exists() && snapshot.hasChild('offer')) { incomingCallData = snapshot.val(); const callerInfo = allUsersCache[incomingCallData.from]; const callType = incomingCallData.type === 'video' ? 'فيديو' : 'صوتية'; elements.callerName.textContent = callerInfo?.username || 'مستخدم غير معروف'; elements.incomingCallTitle.textContent = `مكالمة ${callType} واردة`; toasts.incomingCall.show(); if (document.hidden) { showNotification(`مكالمة ${callType} واردة`, `لديك مكالمة من ${callerInfo.username}`, callerInfo.avatar); } } }); };
+            const answerCall = async () => { toasts.incomingCall.hide(); if (!incomingCallData) return; const callType = incomingCallData.type; const callerInfo = allUsersCache[incomingCallData.from]; try { localStream = await navigator.mediaDevices.getUserMedia({ video: (callType === 'video'), audio: true }); elements.localVideo.srcObject = localStream; } catch (e) { showAlert('لا يمكن الوصول للكاميرا والميكروفون.', 'danger'); return; } setupCallUI(callType, callerInfo); modals.call.show(); pc = new RTCPeerConnection(configuration); localStream.getTracks().forEach(track => pc.addTrack(track, localStream)); pc.ontrack = event => { elements.remoteVideo.srcObject = event.streams[0]; }; pc.onicecandidate = event => { if (event.candidate) database.ref(`calls/${incomingCallData.from}/iceCandidates`).push(event.candidate.toJSON()); }; await pc.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer)); const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); await database.ref(`calls/${incomingCallData.from}/answer`).set({ sdp: answer.sdp, type: answer.type }); database.ref(`calls/${currentUser.uid}/iceCandidates`).on('child_added', async snapshot => { if (snapshot.exists()) { await pc.addIceCandidate(new RTCIceCandidate(snapshot.val())); snapshot.ref.remove(); } }); database.ref(`calls/${currentUser.uid}`).remove(); incomingCallData = null; };
+            const setupCallUI = (callType, remoteUser) => { if (callType === 'video') { elements.callAudioUI.classList.add('hidden'); elements.remoteVideo.classList.remove('hidden'); } else { elements.remoteVideo.classList.add('hidden'); elements.callAudioUI.classList.remove('hidden'); elements.callRemoteAvatar.src = remoteUser.avatar; elements.callRemoteUsername.textContent = remoteUser.username; } };
+            const rejectCall = () => { toasts.incomingCall.hide(); if (incomingCallData) { database.ref(`calls/${currentUser.uid}`).remove(); incomingCallData = null; } };
+            const hangUp = () => { if (pc) { pc.close(); pc = null; } if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; } elements.localVideo.srcObject = null; elements.remoteVideo.srcObject = null; const calleeId = selectedUser?.uid || incomingCallData?.from; if(calleeId) database.ref(`calls/${calleeId}`).remove(); if(currentUser) database.ref(`calls/${currentUser.uid}`).remove(); modals.call.hide(); };
+            
+            const showUserProfile = async (uid) => { viewingProfileUid = uid; const user = allUsersCache[uid]; if (!user) return; document.getElementById('profile-view-avatar').src = user.avatar; document.getElementById('profile-view-username').textContent = user.username; document.getElementById('profile-view-bio').textContent = user.bio || 'لا توجد نبذة تعريفية.'; document.getElementById('profile-view-joined').textContent = new Date(user.joinedDate).toLocaleDateString(); document.getElementById('profile-view-last-seen').textContent = user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'غير معروف'; document.getElementById('block-user-btn').textContent = blockedUsers.includes(uid) ? 'فك حظر المستخدم' : 'حظر المستخدم'; const addFriendBtn = document.getElementById('add-friend-btn'); if (friends.includes(uid)) { addFriendBtn.innerHTML = '<i class="fas fa-user-minus me-2"></i>إزالة من الأصدقاء'; addFriendBtn.classList.replace('btn-success', 'btn-outline-secondary'); } else { addFriendBtn.innerHTML = '<i class="fas fa-user-plus me-2"></i>إضافة صديق'; addFriendBtn.classList.replace('btn-outline-secondary', 'btn-success'); } modals.userProfile.show(); };
+            const toggleBlockUser = async () => { const uid = viewingProfileUid; const blockRef = database.ref(`users/${currentUser.uid}/blocked/${uid}`); if (blockedUsers.includes(uid)) { await blockRef.remove(); blockedUsers = blockedUsers.filter(id => id !== uid); showAlert('تم فك حظر المستخدم.', 'success'); } else { await blockRef.set(true); blockedUsers.push(uid); showAlert('تم حظر المستخدم بنجاح.'); } modals.userProfile.hide(); renderAllLists(); };
+            const toggleFriend = async () => { const uid = viewingProfileUid; const friendRef = database.ref(`users/${currentUser.uid}/friends/${uid}`); if (friends.includes(uid)) { await friendRef.remove(); friends = friends.filter(id => id !== uid); showAlert('تمت إزالة الصديق بنجاح.', 'info'); } else { await friendRef.set(true); friends.push(uid); showAlert('تمت إضافة الصديق بنجاح!', 'success'); } modals.userProfile.hide(); renderAllLists(); };
+            const showReportUserModal = () => { if (!viewingProfileUid) return; document.getElementById('report-modal-username').textContent = allUsersCache[viewingProfileUid]?.username || 'هذا المستخدم'; document.querySelectorAll('input[name="reportReason"]').forEach(radio => radio.checked = false); document.getElementById('report-details-input').value = ''; modals.userProfile.hide(); modals.reportUser.show(); };
+            const submitReport = async () => { const reason = document.querySelector('input[name="reportReason"]:checked')?.value; if (!reason) return showAlert('الرجاء تحديد سبب للإبلاغ.'); const details = document.getElementById('report-details-input').value.trim(); await database.ref('reports').push({ reporterUid: currentUser.uid, reportedUid: viewingProfileUid, reason: reason, details: details, timestamp: firebase.database.ServerValue.TIMESTAMP }); showAlert('تم استلام بلاغك، شكرًا لك.', 'info'); modals.reportUser.hide(); };
+            const showAccountSettings = () => { document.getElementById('profile-bio-input').value = currentUser.bio || ''; ['current-password', 'new-password', 'confirm-new-password'].forEach(id => document.getElementById(id).value = ''); modals.accountSettings.show(); };
+            const saveSettings = async () => { const newBio = document.getElementById('profile-bio-input').value.trim(); if (newBio !== (currentUser.bio || '')) { await database.ref(`users/${currentUser.uid}/bio`).set(newBio); currentUser.bio = newBio; allUsersCache[currentUser.uid].bio = newBio; } const currentPassword = document.getElementById('current-password').value; const newPassword = document.getElementById('new-password').value; if (currentPassword && newPassword) { if (newPassword.length < 6 || newPassword !== document.getElementById('confirm-new-password').value) { return showAlert('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل ومتطابقة.'); } try { const credential = firebase.auth.EmailAuthProvider.credential(auth.currentUser.email, currentPassword); await auth.currentUser.reauthenticateWithCredential(credential); await auth.currentUser.updatePassword(newPassword); showAlert('تم تحديث البيانات وكلمة المرور بنجاح.', 'success'); modals.accountSettings.hide(); } catch (error) { showAlert('كلمة المرور الحالية غير صحيحة.'); } } else { showAlert('تم تحديث البيانات بنجاح.', 'success'); modals.accountSettings.hide(); } };
+            const confirmDeleteAccount = () => { if (currentUser.isOwner) { return showAlert('لا يمكن حذف حساب المالك الرئيسي.', 'warning'); } modals.accountSettings.hide(); elements.deleteConfirmInput.value = ''; elements.finalDeleteBtn.disabled = true; modals.deleteAccountConfirm.show(); };
+            const deleteCurrentUserAccount = async () => { const password = prompt('للتأكيد النهائي، يرجى إدخال كلمة المرور الخاصة بك:'); if (!password) return; try { const user = auth.currentUser; const credential = firebase.auth.EmailAuthProvider.credential(user.email, password); await user.reauthenticateWithCredential(credential); const uid = user.uid; await database.ref(`users/${uid}`).remove(); await database.ref(`status/${uid}`).remove(); await user.delete(); showAlert('تم حذف حسابك بنجاح.', 'success'); modals.deleteAccountConfirm.hide(); } catch (error) { showAlert('فشل حذف الحساب. قد تكون كلمة المرور غير صحيحة أو انتهت صلاحية الجلسة.'); } };
+            const forceRefreshData = async () => { showAlert('جاري تحديث البيانات...', 'info'); try { allUsersCache = (await database.ref('users').once('value')).val() || {}; await renderAllLists(); showAlert('تم تحديث البيانات بنجاح!', 'success'); } catch(e) { showAlert('فشل تحديث البيانات.', 'danger'); } };
+            const toggleNotifications = async () => { const currentStatus = currentUser.settings.notifications !== false; const newStatus = !currentStatus; await database.ref(`users/${currentUser.uid}/settings/notifications`).set(newStatus); currentUser.settings.notifications = newStatus; showAlert(`تم ${newStatus ? 'تفعيل' : 'إيقاف'} الإشعارات بنجاح.`, 'info'); updateNotificationToggleUI(); };
+            const updateNotificationToggleUI = () => { if(!currentUser || !currentUser.settings) return; const btn = elements.notificationsToggleBtn; const icon = btn.querySelector('i'); const text = btn.querySelector('span'); const isEnabled = currentUser.settings.notifications !== false; if(isEnabled) { icon.className = 'fas fa-bell'; text.textContent = 'إيقاف الإشعارات'; } else { icon.className = 'fas fa-bell-slash'; text.textContent = 'تفعيل الإشعارات'; } };
+
+            // START: MODIFICATION - Add event listeners for new features
+            const handleTyping = () => {
+                if (!currentUser || !selectedUser) return;
+                const chatId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
+                const typingRef = database.ref(`typing_status/${chatId}/${currentUser.uid}`);
+                typingRef.set(true);
+                typingRef.onDisconnect().remove(); // Clean up if window is closed
+                if (typingTimeout) clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    typingRef.remove();
+                }, 3000); // User is considered not typing after 3 seconds of inactivity
+            };
+
+            const listenForTyping = (receiverId) => {
+                if (typingListener) typingListener.off();
+                const chatId = currentUser.uid < receiverId ? `${currentUser.uid}_${receiverId}` : `${receiverId}_${currentUser.uid}`;
+                typingListener = database.ref(`typing_status/${chatId}/${receiverId}`);
+                typingListener.on('value', snap => {
+                    const statusText = elements.userStatus;
+                    if (snap.exists() && snap.val() === true) {
+                        statusText.textContent = '...يكتب الآن';
+                        statusText.style.color = 'var(--primary-color)';
+                    } else {
+                        // Revert to online/offline status
+                        database.ref(`status/${receiverId}/status`).once('value', statusSnap => {
+                            statusText.textContent = statusSnap.val() === 'online' ? 'متصل' : 'غير متصل';
+                            statusText.style.color = '';
+                        });
+                    }
+                });
+            };
+
+            const handleMessageActions = (e) => {
+                const target = e.target;
+                const action = target.dataset.action;
+                const messageId = target.dataset.messageId;
+
+                if (!action || !messageId) return;
+
+                if (action === 'delete') {
+                    if (confirm('هل أنت متأكد من حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء.')) {
+                        database.ref(`messages/${messageId}`).remove();
+                    }
+                } else if (action === 'pick-reaction') {
+                    const picker = document.querySelector(`.reaction-picker[data-picker-for="${messageId}"]`);
+                    if (picker) picker.classList.toggle('show');
+                } else if (action === 'react') {
+                    const emoji = target.dataset.emoji;
+                    toggleReaction(messageId, emoji);
+                    const picker = document.querySelector(`.reaction-picker[data-picker-for="${messageId}"]`);
+                    if (picker) picker.classList.remove('show');
+                }
+            };
+            
+            const toggleReaction = (messageId, emoji) => {
+                const reactionRef = database.ref(`messages/${messageId}/reactions/${emoji}/${currentUser.uid}`);
+                reactionRef.once('value', snap => {
+                    if (snap.exists()) {
+                        reactionRef.remove(); // User has already reacted, so remove it
+                    } else {
+                        reactionRef.set(true); // Add user's reaction
+                    }
+                });
+            };
+
+            const createReactionsHtml = (reactions, messageId) => {
+                if (!reactions) return '';
+                return Object.entries(reactions).map(([emoji, uids]) => {
+                    const userReacted = uids[currentUser.uid];
+                    const count = Object.keys(uids).length;
+                    return `<span class="reaction-badge ${userReacted ? 'user-reacted' : ''}" data-action="react" data-emoji="${emoji}" data-message-id="${messageId}">${emoji} ${count}</span>`;
+                }).join('');
+            };
+            // END: MODIFICATION
+
+            const addEventListeners = () => {
+                elements.loginButton.addEventListener('click', login);
+                elements.registerButton.addEventListener('click', () => modals.register.show());
+                elements.registerSubmit.addEventListener('click', registerUser);
+                elements.forgotPasswordLink.addEventListener('click', () => modals.passwordReset.show());
+                elements.backToListButton.addEventListener('click', backToList);
+                elements.sendButton.addEventListener('click', sendMessage);
+                elements.messageInput.addEventListener('keypress', e => e.key === 'Enter' && sendMessage());
+                elements.searchInput.addEventListener('input', renderAllLists);
+                elements.myProfileBtn.addEventListener('click', () => showAccountSettings());
+                elements.accountSettingsBtn.addEventListener('click', () => showAccountSettings());
+                elements.saveSettingsBtn.addEventListener('click', saveSettings);
+                elements.refreshDataBtn.addEventListener('click', forceRefreshData);
+                elements.notificationsToggleBtn.addEventListener('click', toggleNotifications);
+                elements.deleteAccountBtn.addEventListener('click', confirmDeleteAccount);
+                elements.deleteConfirmInput.addEventListener('input', () => { elements.finalDeleteBtn.disabled = elements.deleteConfirmInput.value !== 'حذف'; });
+                elements.finalDeleteBtn.addEventListener('click', deleteCurrentUserAccount);
+                elements.submitReportBtn.addEventListener('click', submitReport);
+                document.getElementById('report-user-btn').addEventListener('click', showReportUserModal);
+                
+                // START: MODIFICATION - Add listeners for new features
+                elements.messageInput.addEventListener('input', handleTyping);
+                elements.chatMessages.addEventListener('click', handleMessageActions);
+                // END: MODIFICATION
+
+                document.getElementById('myTabContent').addEventListener('click', e => { const avatar = e.target.closest('.avatar'); const item = e.target.closest('.user-list-item'); if (avatar) { e.stopPropagation(); showUserProfile(avatar.dataset.uid); } else if (item) { selectUser(item.dataset.uid); } });
+                document.getElementById('add-friend-btn').addEventListener('click', toggleFriend);
+                document.getElementById('block-user-btn').addEventListener('click', toggleBlockUser);
+                elements.settingsBtn.addEventListener('click', () => elements.settingsDropdown.classList.toggle('show'));
+                document.addEventListener('click', e => { if (!elements.settingsMenu.contains(e.target)) elements.settingsDropdown.classList.remove('show'); if (!e.target.closest('.message-actions')) { document.querySelectorAll('.reaction-picker.show').forEach(p => p.classList.remove('show')); } });
+                elements.logoutBtn.addEventListener('click', () => { if (confirm('هل أنت متأكد من رغبتك في تسجيل الخروج؟')) { hangUp(); database.ref(`/status/${currentUser.uid}`).set({ status: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP }).then(() => { auth.signOut(); }); } });
+                elements.blockedUsersBtn.addEventListener('click', showBlockedUsers);
+                elements.switchAccountBtn.addEventListener('click', showSwitchAccount);
+                document.getElementById('switch-account-list').addEventListener('click', e => { const item = e.target.closest('.switch-account-item'); if (item) switchAccount(item.dataset.email); });
+                elements.adminPanelButton.addEventListener('click', showAdminPanel);
+                elements.sendAnnouncementBtn.addEventListener('click', postAnnouncement);
+                elements.adminUserSearch.addEventListener('input', loadAdminUsers);
+                document.getElementById('admin-reports-list').addEventListener('click', handleAdminReportAction);
+                document.getElementById('admin-users-list').addEventListener('click', handleAdminUserAction);
+                [elements.videoCallBtn, elements.audioCallBtn].forEach(btn => { btn.addEventListener('click', (e) => { e.preventDefault(); startCall(btn.dataset.callType); }); });
+                elements.hangUpBtn.addEventListener('click', hangUp);
+                elements.acceptCallBtn.addEventListener('click', answerCall);
+                elements.rejectCallBtn.addEventListener('click', rejectCall);
+            };
+
+            const showAdminPanel = () => { loadAdminReports(); loadAdminUsers(); modals.adminPanel.show(); };
+            const loadAdminReports = async () => { const reportsSnap = await database.ref('reports').orderByChild('timestamp').once('value'); const listEl = document.getElementById('admin-reports-list'); const reports = []; reportsSnap.forEach(snap => { reports.push({ id: snap.key, ...snap.val() }); }); reports.reverse(); if (reports.length === 0) { listEl.innerHTML = '<p class="text-center text-muted p-3">لا توجد بلاغات حالياً.</p>'; return; } const reasonMap = { 'spam': 'رسائل مزعجة', 'harassment': 'مضايقة', 'inappropriate_content': 'محتوى غير لائق', 'other': 'سبب آخر' }; let html = ''; for (const report of reports) { const reporter = allUsersCache[report.reporterUid]?.username || 'مستخدم محذوف'; const reported = allUsersCache[report.reportedUid]?.username || 'مستخدم محذوف'; html += `<div class="list-group-item"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">بلاغ ضد: <strong class="text-danger">${reported}</strong></h6><small>${new Date(report.timestamp).toLocaleString()}</small></div><p class="mb-1"><strong>السبب:</strong> ${reasonMap[report.reason] || report.reason}</p>${report.details ? `<p class="mb-1 small text-muted fst-italic"><strong>التفاصيل:</strong> "${report.details}"</p>` : ''}<p class="mb-1 small">المُبلّغ: ${reporter}</p><div class="mt-2"><button class="btn btn-sm btn-outline-info admin-action-btn" data-action="view-profile" data-uid="${report.reportedUid}">عرض الملف الشخصي</button><button class="btn btn-sm btn-outline-success admin-action-btn ms-2" data-action="dismiss-report" data-id="${report.id}">تجاهل البلاغ</button></div></div>`; } listEl.innerHTML = html; };
+            const loadAdminUsers = () => { const listEl = document.getElementById('admin-users-list'); const searchTerm = elements.adminUserSearch.value.toLowerCase(); let html = ''; Object.values(allUsersCache).filter(u => u.uid !== currentUser.uid).forEach(user => { if (searchTerm && !user.username.toLowerCase().includes(searchTerm) && !user.email.toLowerCase().includes(searchTerm)) return; const isBanned = user.isBanned || false; html += `<div class="list-group-item d-flex justify-content-between align-items-center"><div><h6 class="mb-0">${user.username} ${user.isOwner ? '<i class="fas fa-crown text-warning"></i>' : ''}</h6><small class="text-muted">${user.email}</small>${isBanned ? '<span class="badge bg-danger ms-2">مقيد</span>' : ''}</div><div><button class="btn btn-sm btn-outline-warning admin-action-btn" data-action="toggle-ban" data-uid="${user.uid}" ${user.isOwner ? 'disabled' : ''}>${isBanned ? 'فك التقييد' : 'تقييد'}</button><button class="btn btn-sm btn-outline-danger admin-action-btn ms-2" data-action="delete-user" data-uid="${user.uid}" ${user.isOwner ? 'disabled' : ''}>حذف</button></div></div>`; }); listEl.innerHTML = html || '<p class="text-center text-muted p-3">لا يوجد مستخدمون.</p>'; };
+            const handleAdminReportAction = (e) => { const target = e.target.closest('.admin-action-btn'); if (!target) return; const { action, uid, id } = target.dataset; if (action === 'view-profile') { modals.adminPanel.hide(); showUserProfile(uid); } else if (action === 'dismiss-report') { if (confirm('هل أنت متأكد من تجاهل هذا البلاغ؟')) { database.ref(`reports/${id}`).remove().then(() => { showAlert('تم تجاهل البلاغ بنجاح.', 'success'); loadAdminReports(); }); } } };
+            const handleAdminUserAction = async (e) => { const target = e.target.closest('.admin-action-btn'); if (!target) return; const { action, uid } = target.dataset; const username = allUsersCache[uid]?.username; if (action === 'toggle-ban') { const isCurrentlyBanned = allUsersCache[uid].isBanned || false; const actionText = isCurrentlyBanned ? 'فك تقييد' : 'تقييد'; if (confirm(`هل أنت متأكد من ${actionText} المستخدم ${username}؟`)) { await database.ref(`users/${uid}/isBanned`).set(!isCurrentlyBanned); allUsersCache[uid].isBanned = !isCurrentlyBanned; showAlert(`تم ${actionText} المستخدم بنجاح.`, 'success'); loadAdminUsers(); } } else if (action === 'delete-user') { if (confirm(`تحذير: هذا الإجراء سيحذف المستخدم ${username} وجميع بياناته نهائياً. هل أنت متأكد؟`)) { await database.ref(`users/${uid}`).remove(); await database.ref(`status/${uid}`).remove(); delete allUsersCache[uid]; showAlert('تم حذف المستخدم وبياناته من قاعدة البيانات.', 'success'); loadAdminUsers(); } } };
+            const postAnnouncement = () => { const text = document.getElementById('announcement-text').value.trim(); if (!text) return showAlert('لا يمكن إرسال إعلان فارغ.'); database.ref('announcements').push({ text, timestamp: firebase.database.ServerValue.TIMESTAMP, sender: currentUser.username }).then(() => { showAlert('تم إرسال الإعلان بنجاح!', 'success'); document.getElementById('announcement-text').value = ''; modals.adminPanel.hide(); }); };
+            const listenForAnnouncements = () => { const announcementsRef = database.ref('announcements').orderByChild('timestamp').startAt(Date.now()); announcementsRef.on('child_added', (snapshot) => { const announcement = snapshot.val(); showAlert(`📢 إعلان جديد: ${announcement.text}`, 'info'); }); };
+            const showBlockedUsers = () => { const listEl = document.getElementById('blocked-users-list'); if (blockedUsers.length === 0) { listEl.innerHTML = '<p class="text-center text-muted">لا يوجد مستخدمون محظورون.</p>'; } else { listEl.innerHTML = blockedUsers.map(uid => { const user = allUsersCache[uid]; return user ? `<div class="list-group-item d-flex justify-content-between align-items-center"><span>${user.username}</span><button class="btn btn-sm btn-outline-success" onclick="window.unblockUser('${uid}')">فك الحظر</button></div>` : ''; }).join(''); } modals.blockedUsers.show(); };
+            window.unblockUser = async (uid) => { await database.ref(`users/${currentUser.uid}/blocked/${uid}`).remove(); blockedUsers = blockedUsers.filter(id => id !== uid); showAlert('تم فك الحظر.', 'success'); showBlockedUsers(); renderAllLists(); };
+            const getStoredAccounts = () => JSON.parse(localStorage.getItem('fikoAccounts') || '[]');
+            const addAccountToStorage = (email) => { let accounts = getStoredAccounts(); if (!accounts.includes(email)) { accounts.push(email); localStorage.setItem('fikoAccounts', JSON.stringify(accounts)); } };
+            const showSwitchAccount = () => { const accounts = getStoredAccounts(); const listEl = document.getElementById('switch-account-list'); listEl.innerHTML = accounts.map(email => `<div class="switch-account-item ${email === currentUser.email ? 'active' : ''}" data-email="${email}"><i class="fas fa-user-circle fa-lg me-2"></i><span>${email}</span></div>`).join(''); modals.switchAccount.show(); };
+            const switchAccount = (email) => { if (email === currentUser.email) return modals.switchAccount.hide(); auth.signOut().then(() => { document.getElementById('login-email').value = email; modals.switchAccount.hide(); }); };
+
+            initApp();
+        });
+    </script>
+</body>
+</html>
